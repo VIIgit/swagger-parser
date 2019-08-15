@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.parser.core.models.AuthorizationValue;
 import io.swagger.v3.parser.models.RefFormat;
@@ -117,8 +118,12 @@ public class ResolverCache {
             if(parentDirectory != null) {
                 contents = RefUtils.readExternalRef(file, refFormat, auths, parentDirectory);
             }
-            else if(rootPath != null) {
+            else if(rootPath != null && rootPath.startsWith("http")) {
                 contents = RefUtils.readExternalUrlRef(file, refFormat, auths, rootPath);
+            }
+            else if (rootPath != null) {
+                contents = RefUtils.readExternalClasspathRef(file, refFormat, auths, rootPath);
+
             }
             externalFileCache.put(file, contents);
         }
@@ -165,6 +170,12 @@ public class ResolverCache {
                 }
             }
         }
+        if(result instanceof Parameter){
+            Parameter parameter = (Parameter)result;
+            if (parameter.getSchema() != null){
+                updateLocalRefs(file,parameter.getSchema());
+            }
+        }
         if(result instanceof Schema && ((Schema)(result)).get$ref() != null) {
             Schema prop = (Schema) result;
             updateLocalRefs(file, prop);
@@ -194,11 +205,12 @@ public class ResolverCache {
         if(StringUtils.isBlank(host)) {
             return ref;
         }
+
         if(ref.startsWith("http:") || ref.startsWith("https:")) {
             // already an absolute ref
             return ref;
         }
-        if(!host.startsWith("http:") && !host.startsWith("https:")) {
+        if(!host.startsWith("http:") && !host.startsWith("https:") && !ref.startsWith("#/components")) {
             return ref;
         }
         if(ref.startsWith(".")) {
