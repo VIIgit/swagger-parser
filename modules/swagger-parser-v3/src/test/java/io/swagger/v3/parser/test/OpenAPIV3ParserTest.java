@@ -66,6 +66,37 @@ public class OpenAPIV3ParserTest {
     protected int serverPort = getDynamicPort();
     protected WireMockServer wireMockServer;
 
+    @Test
+    public void testIssue1147() {
+        ParseOptions options = new ParseOptions();
+        options.setResolve(true);
+        options.setFlatten(true);
+        SwaggerParseResult parseResult = new OpenAPIV3Parser().readLocation("issue-1147/issue1147.yaml", null, options);
+        OpenAPI apispec = parseResult.getOpenAPI();
+        assertNotNull(apispec);
+        assertEquals(((Schema)apispec.getComponents().getSchemas().get("StringObject").getProperties().get("val")).get$ref(),"#/components/schemas/String");
+    }
+
+    @Test
+    public void testIssue1148_Flatten_Dot() {
+        ParseOptions options = new ParseOptions();
+        options.setFlatten(true);
+        SwaggerParseResult parseResult = new OpenAPIV3Parser().readLocation("issue1148.yaml", null, options);
+        OpenAPI apispec = parseResult.getOpenAPI();
+        assertNotNull(apispec);
+        assertEquals(((Schema)apispec.getComponents().getSchemas().get("Some.User").getProperties().get("address")).get$ref(),"#/components/schemas/Some.User_address");
+    }
+
+
+    @Test
+    public void testIssue1169() {
+        ParseOptions options = new ParseOptions();
+        options.setResolve(true);
+        SwaggerParseResult parseResult = new OpenAPIV3Parser().readLocation("issue1169.yaml", null, options);
+        assertTrue(parseResult.getMessages().size() == 0);
+        OpenAPI apispec = parseResult.getOpenAPI();
+        assertNotNull(apispec);
+    }
 
 
     @Test
@@ -2033,6 +2064,34 @@ public class OpenAPIV3ParserTest {
         assertEquals(api.getPaths().get("/anPath").getGet().getParameters().get(1).getName(), "unit-id");
 
         assertThat(result.getMessages(), equalTo(emptyList()));
+
+    }
+
+    @Test
+    public void testIssue1177(@Injectable final List<AuthorizationValue> auths) {
+        String path = "/issue-1177/swagger.yaml";
+
+        ParseOptions options = new ParseOptions();
+        options.setResolve(true);
+        options.setResolveFully(true);
+
+        OpenAPI openAPI = new OpenAPIV3Parser().readLocation(path, auths, options).getOpenAPI();
+
+        // $ref response with $ref header
+        ApiResponse petsListApiResponse = openAPI.getPaths().get("/update-pets").getPost().getResponses().get("200");
+        assertNotNull(petsListApiResponse);
+
+        Header sessionIdHeader = petsListApiResponse.getHeaders().get("x-session-id");
+        assertNotNull(sessionIdHeader);
+
+        Schema petsListSchema = openAPI.getComponents().getSchemas().get("PetsList");
+        assertNotNull(petsListSchema);
+
+        assertNotNull(openAPI.getComponents().getHeaders());
+        Header sessionIdHeaderComponent = openAPI.getComponents().getHeaders().get("x-session-id");
+        assertTrue(sessionIdHeader == sessionIdHeaderComponent);
+
+        assertTrue(petsListApiResponse.getContent().get("application/json").getSchema() == petsListSchema);
 
     }
 
